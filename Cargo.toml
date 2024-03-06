@@ -1,0 +1,3 @@
+[workspace]
+members = ["src/ic_sft_canister"]
+resolver = "2"

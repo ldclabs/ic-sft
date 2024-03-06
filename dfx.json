@@ -1,0 +1,21 @@
+{
+  "canisters": {
+    "ic_sft_canister": {
+      "candid": "src/ic_sft_canister/ic_sft_canister.did",
+      "package": "ic_sft_canister",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "optimize": "cycles",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
