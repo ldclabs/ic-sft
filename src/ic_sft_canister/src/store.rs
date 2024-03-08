@@ -13,7 +13,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use crate::types::{Icrc7TokenMetadata, TransferError};
+use crate::types::{Metadata, TransferError};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -44,6 +44,8 @@ pub struct Settings {
     pub atomic_batch_transfers: bool,
     pub tx_window: u64,       // in seconds
     pub permitted_drift: u64, // in seconds
+    pub max_approvals_per_token_or_collection: Option<u64>,
+    pub max_revoke_approvals: Option<u64>,
 }
 
 impl Storable for Collection {
@@ -61,8 +63,8 @@ impl Storable for Collection {
 }
 
 impl Collection {
-    pub fn metadata(&self) -> Icrc7TokenMetadata {
-        let mut res = Icrc7TokenMetadata::new();
+    pub fn metadata(&self) -> Metadata {
+        let mut res = Metadata::new();
         res.insert("icrc7:symbol".to_string(), self.symbol.as_str().into());
         res.insert("icrc7:name".to_string(), self.name.as_str().into());
         if let Some(ref description) = self.description {
@@ -74,6 +76,20 @@ impl Collection {
         res.insert("icrc7:total_supply".to_string(), self.total_supply.into());
         if let Some(supply_cap) = self.supply_cap {
             res.insert("icrc7:supply_cap".to_string(), supply_cap.into());
+        }
+        res
+    }
+
+    pub fn icrc37_metadata(&self) -> Metadata {
+        let mut res = Metadata::new();
+        if let Some(val) = self.settings.max_approvals_per_token_or_collection {
+            res.insert(
+                "icrc37:max_approvals_per_token_or_collection".to_string(),
+                val.into(),
+            );
+        }
+        if let Some(val) = self.settings.max_revoke_approvals {
+            res.insert("icrc37:max_revoke_approvals".to_string(), val.into());
         }
         res
     }
@@ -110,7 +126,7 @@ impl Storable for Token {
 }
 
 impl Token {
-    pub fn metadata(&self) -> Icrc7TokenMetadata {
+    pub fn metadata(&self) -> Metadata {
         let mut res = self.metadata.clone();
         res.insert("icrc7:name".to_string(), self.name.as_str().into());
         if let Some(ref description) = self.description {
@@ -301,7 +317,7 @@ const TRANSACTIONS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(5);
 const TRANSACTIONS_DATA_MEMORY_ID: MemoryId = MemoryId::new(6);
 
 thread_local! {
-    static SIGNING_SECRET: RefCell<[u8; 32]> = RefCell::new([0; 32]);
+    static CHALLENGE_SECRET: RefCell<[u8; 32]> = RefCell::new([0; 32]);
 
     static COLLECTION_HEAP: RefCell<Collection> = RefCell::new(Collection::default());
 
@@ -347,15 +363,15 @@ thread_local! {
     );
 }
 
-pub mod signing {
+pub mod challenge {
     use super::*;
 
     pub fn with_secret<R>(f: impl FnOnce(&[u8]) -> R) -> R {
-        SIGNING_SECRET.with(|r| f(r.borrow().as_slice()))
+        CHALLENGE_SECRET.with(|r| f(r.borrow().as_slice()))
     }
 
     pub fn set_secret(secret: [u8; 32]) {
-        SIGNING_SECRET.with(|r| *r.borrow_mut() = secret);
+        CHALLENGE_SECRET.with(|r| *r.borrow_mut() = secret);
     }
 }
 

@@ -1,9 +1,5 @@
 type Account = record { owner : principal; subaccount : opt vec nat8 };
-type ChallengeArg = record {
-  ts : nat64;
-  asset_hash : vec nat8;
-  author : principal;
-};
+type ChallengeArg = record { asset_hash : vec nat8; author : principal };
 type CreateTokenArg = record {
   asset_name : text;
   supply_cap : opt nat32;
@@ -25,8 +21,10 @@ type InitArg = record {
   description : opt text;
   max_take_value : opt nat16;
   max_update_batch_size : opt nat16;
+  max_approvals_per_token_or_collection : opt nat64;
   max_query_batch_size : opt nat16;
   assets_origin : opt text;
+  max_revoke_approvals : opt nat64;
   max_memo_size : opt nat16;
   atomic_batch_transfers : opt bool;
   symbol : text;
@@ -76,8 +74,10 @@ type UpdateCollectionArg = record {
   description : opt text;
   max_take_value : opt nat16;
   max_update_batch_size : opt nat16;
+  max_approvals_per_token_or_collection : opt nat64;
   max_query_batch_size : opt nat16;
   assets_origin : opt text;
+  max_revoke_approvals : opt nat64;
   max_memo_size : opt nat16;
   atomic_batch_transfers : opt bool;
 };
@@ -95,6 +95,9 @@ type UpdateTokenArg = record {
 service : (InitArg) -> {
   admin_set_managers : (vec principal) -> (Result);
   admin_set_minters : (vec principal) -> (Result);
+  icrc37_max_approvals_per_token_or_collection : () -> (opt nat) query;
+  icrc37_max_revoke_approvals : () -> (opt nat) query;
+  icrc37_metadata : () -> (vec record { text; MetadataValue }) query;
   icrc7_atomic_batch_transfers : () -> (opt bool) query;
   icrc7_balance_of : (vec Account) -> (vec nat) query;
   icrc7_collection_metadata : () -> (vec record { text; MetadataValue }) query;

@@ -1,12 +1,12 @@
 use candid::Nat;
 use icrc_ledger_types::icrc1::account::Account;
 
-use crate::store;
-use crate::types::{nat_to_u64, Icrc7TokenMetadata, SftId, Standard};
+use crate::types::{Metadata, SftId, Standard};
+use crate::{nat_to_u64, store};
 
 /// Returns all the collection-level metadata of the NFT collection in a single query.
 #[ic_cdk::query]
-pub fn icrc7_collection_metadata() -> Icrc7TokenMetadata {
+pub fn icrc7_collection_metadata() -> Metadata {
     store::collection::with(|c| c.metadata())
 }
 
@@ -85,7 +85,7 @@ pub fn icrc7_atomic_batch_transfers() -> Option<bool> {
 
 /// Returns the token metadata for `token_ids`, a list of token ids.
 #[ic_cdk::query]
-pub fn icrc7_token_metadata(token_ids: Vec<Nat>) -> Vec<Option<Icrc7TokenMetadata>> {
+pub fn icrc7_token_metadata(token_ids: Vec<Nat>) -> Vec<Option<Metadata>> {
     if token_ids.is_empty() {
         return vec![];
     }
@@ -254,8 +254,36 @@ pub fn sft_tokens_in(token_id: Nat, prev: Option<Nat>, take: Option<Nat>) -> Vec
 /// Returns the list of standards this ledger implements.
 #[ic_cdk::query]
 pub fn icrc7_supported_standards() -> Vec<Standard> {
-    vec![Standard {
-        name: "ICRC-7".into(),
-        url: "https://github.com/dfinity/ICRC/ICRCs/ICRC-7".into(),
-    }]
+    vec![
+        Standard {
+            name: "ICRC-7".into(),
+            url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-7".into(),
+        },
+        Standard {
+            name: "ICRC-37".into(),
+            url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-37".into(),
+        },
+    ]
+}
+
+/// Returns the approval-related metadata of the ledger implementation.
+#[ic_cdk::query]
+pub fn icrc37_metadata() -> Metadata {
+    store::collection::with(|c| c.icrc37_metadata())
+}
+
+/// Returns the maximum number of approvals this ledger implementation allows to be active per token or per principal for the collection.
+#[ic_cdk::query]
+pub fn icrc37_max_approvals_per_token_or_collection() -> Option<Nat> {
+    store::collection::with(|c| {
+        c.settings
+            .max_approvals_per_token_or_collection
+            .map(Nat::from)
+    })
+}
+
+/// Returns the maximum number of approvals that may be revoked in a single invocation of `icrc37_revoke_token_approvals` or `icrc37_revoke_collection_approvals`.
+#[ic_cdk::query]
+pub fn icrc37_max_revoke_approvals() -> Option<Nat> {
+    store::collection::with(|c| c.settings.max_revoke_approvals.map(Nat::from))
 }

@@ -9,18 +9,12 @@ use icrc_ledger_types::{
     icrc::generic_metadata_value::MetadataValue,
     icrc1::account::{Account, Subaccount},
 };
-use num_traits::cast::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 
-use crate::{mac_256, store::Settings};
+use crate::{nat_to_u64, store::Settings, ANONYMOUS, SECOND};
 
-pub const SECOND: u64 = 1_000_000_000;
-pub static ANONYMOUS: Principal = Principal::anonymous();
-
-pub fn nat_to_u64(nat: &Nat) -> u64 {
-    nat.0.to_u64().unwrap_or(0)
-}
+pub type Metadata = BTreeMap<String, MetadataValue>;
 
 pub struct SftId(pub u32, pub u32);
 
@@ -74,6 +68,8 @@ pub struct InitArg {
     pub atomic_batch_transfers: Option<bool>,
     pub tx_window: Option<u64>,
     pub permitted_drift: Option<u64>,
+    pub max_approvals_per_token_or_collection: Option<u64>,
+    pub max_revoke_approvals: Option<u64>,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -91,60 +87,14 @@ pub struct UpdateCollectionArg {
     pub atomic_batch_transfers: Option<bool>,
     pub tx_window: Option<u64>,
     pub permitted_drift: Option<u64>,
+    pub max_approvals_per_token_or_collection: Option<u64>,
+    pub max_revoke_approvals: Option<u64>,
 }
 
 #[derive(CandidType, Deserialize, Serialize)]
 pub struct ChallengeArg {
     pub author: Principal,
     pub asset_hash: [u8; 32],
-    pub ts: u64,
-}
-
-impl ChallengeArg {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, String> {
-        let mut buf: Vec<u8> = Vec::new();
-        ciborium::into_writer(&self.ts, &mut buf)
-            .map_err(|_err| "failed to encode time".to_string())?;
-        Ok(buf)
-    }
-
-    pub fn sign_to_bytes(&self, key: &[u8]) -> Result<ByteBuf, String> {
-        let mut time: Vec<u8> = Vec::new();
-        ciborium::into_writer(&self.ts, &mut time)
-            .map_err(|_err| "failed to encode time".to_string())?;
-
-        let mac = &mac_256(key, self.to_bytes()?.as_slice())[0..16];
-        let mut challenge: Vec<u8> = Vec::new();
-        ciborium::into_writer(&vec![time.as_slice(), mac], &mut challenge)
-            .map_err(|_err| "failed to encode challenge".to_string())?;
-
-        Ok(ByteBuf::from(challenge))
-    }
-
-    pub fn verify_from_bytes(
-        &mut self,
-        key: &[u8],
-        challenge: &[u8],
-        expire_at: u64,
-    ) -> Result<(), String> {
-        let arr: Vec<Vec<u8>> =
-            ciborium::from_reader(challenge).map_err(|_err| "failed to decode challenge")?;
-
-        if arr.len() != 2 {
-            return Err("invalid challenge".to_string());
-        }
-        self.ts = ciborium::from_reader(&arr[0][..]).map_err(|_err| "failed to decode time")?;
-        if self.ts < expire_at {
-            return Err("challenge expired".to_string());
-        }
-
-        let mac = &mac_256(key, self.to_bytes()?.as_slice())[0..16];
-        if mac != &arr[1][..] {
-            return Err("failed to verify challenge".to_string());
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(CandidType, Deserialize)]
@@ -242,8 +192,6 @@ pub enum TransferError {
 
 pub type TransferResult = Result<Nat, TransferError>;
 
-pub type Icrc7TokenMetadata = BTreeMap<String, MetadataValue>;
-
 #[derive(CandidType, Deserialize, Clone)]
 pub struct MintArg {
     pub token_id: Nat,
@@ -259,17 +207,6 @@ pub enum MintError {
 
 pub type MintResult = Result<Nat, MintError>;
 
-// #[derive(CandidType, Deserialize)]
-// pub struct TransferArgs{
-//     pub spender_subaccount: Option<Subaccount>,
-//     pub from: Account,
-//     pub to: Account,
-//     pub token_ids: Vec<u128>,
-//     pub memo: Option<Vec<u8>>,
-//     pub created_at_time: Option<u64>,
-//     pub is_atomic: Option<bool>,
-// }
-
 #[derive(CandidType, Deserialize)]
 pub struct ApprovalArgs {
     pub from_subaccount: Option<Subaccount>,
@@ -279,15 +216,6 @@ pub struct ApprovalArgs {
     pub memo: Option<Vec<u8>>,
     pub created_at_time: Option<u64>, // as nanoseconds since the UNIX epoch in the UTC timezone
 }
-
-// #[derive(CandidType, Deserialize)]
-// pub struct MintArgs{
-//     pub id: u128,
-//     pub name: String,
-//     pub description: Option<String>,
-//     pub image: Option<Vec<u8>>,
-//     pub to: Account,
-// }
 
 #[derive(CandidType, Serialize, Clone)]
 pub struct Transaction {

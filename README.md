@@ -1,6 +1,6 @@
-# ic-sft
+# IC-SFT
 
-A SFT (Semi-Fungible Token) canister for the Internet Computer.
+A SFT (Semi-Fungible Token, implemented [ICRC-7](https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-7) and [ICRC-37](https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-7)) canister smart contract on the Internet Computer.
 
 ## Running the project locally
 

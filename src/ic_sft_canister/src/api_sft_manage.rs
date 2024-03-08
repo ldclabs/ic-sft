@@ -2,9 +2,9 @@ use candid::{Nat, Principal};
 use serde_bytes::ByteBuf;
 use std::collections::BTreeSet;
 
-use crate::types::{ChallengeArg, CreateTokenArg, UpdateCollectionArg, UpdateTokenArg, SECOND};
-use crate::{is_authenticated, is_controller, SftId};
-use crate::{sha3_256, store};
+use crate::types::{ChallengeArg, CreateTokenArg, UpdateCollectionArg, UpdateTokenArg};
+use crate::utils::{sha3_256, Challenge};
+use crate::{is_authenticated, is_controller, store, SftId, SECOND};
 
 /// Set the minters.
 #[ic_cdk::update(guard = "is_controller")]
@@ -50,42 +50,48 @@ pub fn sft_update_collection(args: UpdateCollectionArg) -> Result<(), String> {
         if let Some(name) = args.name {
             r.name = name;
         }
-        if let Some(description) = args.description {
-            r.description = Some(description);
+        if let Some(val) = args.description {
+            r.description = Some(val);
         }
-        if let Some(logo) = args.logo {
-            r.logo = Some(logo);
+        if let Some(val) = args.logo {
+            r.logo = Some(val);
         }
-        if let Some(assets_origin) = args.assets_origin {
-            r.assets_origin = Some(assets_origin);
+        if let Some(val) = args.assets_origin {
+            r.assets_origin = Some(val);
         }
-        if let Some(supply_cap) = args.supply_cap {
-            r.supply_cap = Some(supply_cap);
+        if let Some(val) = args.supply_cap {
+            r.supply_cap = Some(val);
         }
 
-        if let Some(max_query_batch_size) = args.max_query_batch_size {
-            r.settings.max_query_batch_size = max_query_batch_size;
+        if let Some(val) = args.max_query_batch_size {
+            r.settings.max_query_batch_size = val;
         }
-        if let Some(max_update_batch_size) = args.max_update_batch_size {
-            r.settings.max_update_batch_size = max_update_batch_size;
+        if let Some(val) = args.max_update_batch_size {
+            r.settings.max_update_batch_size = val;
         }
-        if let Some(default_take_value) = args.default_take_value {
-            r.settings.default_take_value = default_take_value;
+        if let Some(val) = args.default_take_value {
+            r.settings.default_take_value = val;
         }
-        if let Some(max_take_value) = args.max_take_value {
-            r.settings.max_take_value = max_take_value;
+        if let Some(val) = args.max_take_value {
+            r.settings.max_take_value = val;
         }
-        if let Some(max_memo_size) = args.max_memo_size {
-            r.settings.max_memo_size = max_memo_size;
+        if let Some(val) = args.max_memo_size {
+            r.settings.max_memo_size = val;
         }
-        if let Some(atomic_batch_transfers) = args.atomic_batch_transfers {
-            r.settings.atomic_batch_transfers = atomic_batch_transfers;
+        if let Some(val) = args.atomic_batch_transfers {
+            r.settings.atomic_batch_transfers = val;
         }
-        if let Some(tx_window) = args.tx_window {
-            r.settings.tx_window = tx_window;
+        if let Some(val) = args.tx_window {
+            r.settings.tx_window = val;
         }
-        if let Some(permitted_drift) = args.permitted_drift {
-            r.settings.permitted_drift = permitted_drift;
+        if let Some(val) = args.permitted_drift {
+            r.settings.permitted_drift = val;
+        }
+        if let Some(val) = args.max_approvals_per_token_or_collection {
+            r.settings.max_approvals_per_token_or_collection = Some(val);
+        }
+        if let Some(val) = args.max_revoke_approvals {
+            r.settings.max_revoke_approvals = Some(val);
         }
     });
 
@@ -102,9 +108,8 @@ pub fn sft_challenge(args: ChallengeArg) -> Result<ByteBuf, String> {
             ic_cdk::trap("Caller is not a manager");
         }
     });
-    let mut args = args;
-    args.ts = ic_cdk::api::time() / SECOND;
-    store::signing::with_secret(|secret| args.sign_to_bytes(secret))
+    let ts = ic_cdk::api::time() / SECOND;
+    store::challenge::with_secret(|secret| Ok(ByteBuf::from(args.challenge(secret, ts))))
 }
 
 /// Create a token.
@@ -152,13 +157,12 @@ pub fn sft_create_token_by_challenge(args: CreateTokenArg) -> Result<Nat, String
     let now = ic_cdk::api::time() / SECOND;
     let expire_at = now - 60 * 10;
     let hash = sha3_256(&args.asset_content);
-    store::signing::with_secret(|secret| {
+    store::challenge::with_secret(|secret| {
         ChallengeArg {
             author: caller,
             asset_hash: hash,
-            ts: 0,
         }
-        .verify_from_bytes(secret, challenge_data, expire_at)
+        .verify(secret, challenge_data, expire_at)
     })?;
 
     create_token(args, hash, now)

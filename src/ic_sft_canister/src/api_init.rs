@@ -1,7 +1,4 @@
-use crate::{
-    mac_256, store,
-    types::{InitArg, SECOND},
-};
+use crate::{store, types::InitArg, utils::mac_256, SECOND};
 use std::time::Duration;
 
 #[ic_cdk::init]
@@ -24,6 +21,9 @@ pub fn init(args: InitArg) {
         r.settings.atomic_batch_transfers = args.atomic_batch_transfers.unwrap_or(false);
         r.settings.tx_window = args.tx_window.unwrap_or(60 * 60);
         r.settings.permitted_drift = args.permitted_drift.unwrap_or(2 * 60);
+        r.settings.max_approvals_per_token_or_collection =
+            args.max_approvals_per_token_or_collection;
+        r.settings.max_revoke_approvals = args.max_revoke_approvals;
     });
 
     store::collection::save();
@@ -49,5 +49,5 @@ async fn load_secret() {
         .await
         .expect("Failed to get random bytes");
 
-    store::signing::set_secret(mac_256(&rr.0, b"SIGNING_SECRET"));
+    store::challenge::set_secret(mac_256(&rr.0, b"CHALLENGE_SECRET"));
 }

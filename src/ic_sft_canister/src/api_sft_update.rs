@@ -4,8 +4,8 @@ use icrc_ledger_types::icrc::generic_metadata_value::MetadataValue;
 use crate::types::{
     MintArg, MintError, MintResult, SftId, TransferArg, TransferError, TransferResult,
 };
-use crate::{is_authenticated, sha3_256, to_cbor_bytes};
-use crate::{store, SECOND};
+use crate::utils::{sha3_256, to_cbor_bytes};
+use crate::{is_authenticated, store, SECOND};
 
 /// Performs a batch of token transfers.
 #[ic_cdk::update(guard = "is_authenticated")]
