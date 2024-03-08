@@ -162,7 +162,7 @@ pub fn sft_create_token_by_challenge(args: CreateTokenArg) -> Result<Nat, String
             author: caller,
             asset_hash: hash,
         }
-        .verify(secret, challenge_data, expire_at)
+        .verify(secret, expire_at, challenge_data)
     })?;
 
     create_token(args, hash, now)
