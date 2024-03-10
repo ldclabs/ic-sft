@@ -26,13 +26,13 @@ fn is_controller() -> Result<(), String> {
     if ic_cdk::api::is_controller(&ic_cdk::caller()) {
         Ok(())
     } else {
-        Err("User is not a controller".to_string())
+        Err("user is not a controller".to_string())
     }
 }
 
 fn is_authenticated() -> Result<(), String> {
     if ic_cdk::caller() == ANONYMOUS {
-        Err("Anonymous user is not allowed".to_string())
+        Err("anonymous user is not allowed".to_string())
     } else {
         Ok(())
     }

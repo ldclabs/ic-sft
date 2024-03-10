@@ -14,16 +14,16 @@ pub fn init(args: InitArg) {
         r.created_at = now;
         r.updated_at = now;
         r.settings.max_query_batch_size = args.max_query_batch_size.unwrap_or(100);
-        r.settings.max_update_batch_size = args.max_update_batch_size.unwrap_or(100);
-        r.settings.default_take_value = args.default_take_value.unwrap_or(20);
-        r.settings.max_take_value = args.max_take_value.unwrap_or(200);
+        r.settings.max_update_batch_size = args.max_update_batch_size.unwrap_or(20);
+        r.settings.default_take_value = args.default_take_value.unwrap_or(10);
+        r.settings.max_take_value = args.max_take_value.unwrap_or(100);
         r.settings.max_memo_size = args.max_memo_size.unwrap_or(32);
         r.settings.atomic_batch_transfers = args.atomic_batch_transfers.unwrap_or(false);
-        r.settings.tx_window = args.tx_window.unwrap_or(60 * 60);
+        r.settings.tx_window = args.tx_window.unwrap_or(2 * 60 * 60);
         r.settings.permitted_drift = args.permitted_drift.unwrap_or(2 * 60);
         r.settings.max_approvals_per_token_or_collection =
-            args.max_approvals_per_token_or_collection;
-        r.settings.max_revoke_approvals = args.max_revoke_approvals;
+            args.max_approvals_per_token_or_collection.unwrap_or(10);
+        r.settings.max_revoke_approvals = args.max_revoke_approvals.unwrap_or(10);
     });
 
     store::collection::save();
@@ -47,7 +47,7 @@ async fn load_secret() {
     // can't be used in `init` and `post_upgrade`
     let rr = ic_cdk::api::management_canister::main::raw_rand()
         .await
-        .expect("Failed to get random bytes");
+        .expect("failed to get random bytes");
 
     store::challenge::set_secret(mac_256(&rr.0, b"CHALLENGE_SECRET"));
 }

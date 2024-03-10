@@ -6,7 +6,7 @@ use crate::types::{ChallengeArg, CreateTokenArg, UpdateCollectionArg, UpdateToke
 use crate::utils::{sha3_256, Challenge};
 use crate::{is_authenticated, is_controller, store, SftId, SECOND};
 
-/// Set the minters.
+// Set the minters.
 #[ic_cdk::update(guard = "is_controller")]
 pub fn admin_set_minters(args: BTreeSet<Principal>) -> Result<(), String> {
     let now = ic_cdk::api::time() / SECOND;
@@ -17,7 +17,7 @@ pub fn admin_set_minters(args: BTreeSet<Principal>) -> Result<(), String> {
     Ok(())
 }
 
-/// Set the managers.
+// Set the managers.
 #[ic_cdk::update(guard = "is_controller")]
 pub fn admin_set_managers(args: BTreeSet<Principal>) -> Result<(), String> {
     let now = ic_cdk::api::time() / SECOND;
@@ -28,18 +28,20 @@ pub fn admin_set_managers(args: BTreeSet<Principal>) -> Result<(), String> {
     Ok(())
 }
 
-/// Update the collection.
+// Update the collection.
 #[ic_cdk::update(guard = "is_authenticated")]
 pub fn sft_update_collection(args: UpdateCollectionArg) -> Result<(), String> {
     let caller = ic_cdk::caller();
 
     store::collection::with(|c| {
         if !c.managers.contains(&caller) {
-            ic_cdk::trap("Caller is not a manager");
+            ic_cdk::trap("caller is not a manager");
         }
 
-        if args.supply_cap.is_some() && c.supply_cap.is_some() {
-            ic_cdk::trap("Supply cap can not be changed");
+        if let Some(supply_cap) = args.supply_cap {
+            if supply_cap >= c.supply_cap.unwrap_or(0) {
+                ic_cdk::trap("supply cap can not be increased");
+            }
         }
     });
 
@@ -88,43 +90,43 @@ pub fn sft_update_collection(args: UpdateCollectionArg) -> Result<(), String> {
             r.settings.permitted_drift = val;
         }
         if let Some(val) = args.max_approvals_per_token_or_collection {
-            r.settings.max_approvals_per_token_or_collection = Some(val);
+            r.settings.max_approvals_per_token_or_collection = val;
         }
         if let Some(val) = args.max_revoke_approvals {
-            r.settings.max_revoke_approvals = Some(val);
+            r.settings.max_revoke_approvals = val;
         }
     });
 
     Ok(())
 }
 
-/// Create a challenge for sft_create_token_by_challenge API.
+// Create a challenge for sft_create_token_by_challenge API.
 #[ic_cdk::update(guard = "is_authenticated")]
 pub fn sft_challenge(args: ChallengeArg) -> Result<ByteBuf, String> {
     let caller = ic_cdk::caller();
 
     store::collection::with(|c| {
         if !c.managers.contains(&caller) {
-            ic_cdk::trap("Caller is not a manager");
+            ic_cdk::trap("caller is not a manager");
         }
     });
     let ts = ic_cdk::api::time() / SECOND;
     store::challenge::with_secret(|secret| Ok(ByteBuf::from(args.challenge(secret, ts))))
 }
 
-/// Create a token.
+// Create a token.
 #[ic_cdk::update(guard = "is_authenticated")]
 pub fn sft_create_token(args: CreateTokenArg) -> Result<Nat, String> {
     let caller = ic_cdk::caller();
 
     store::collection::with(|c| {
         if !c.managers.contains(&caller) {
-            ic_cdk::trap("Caller is not a manager");
+            ic_cdk::trap("caller is not a manager");
         }
 
         if let Some(supply_cap) = c.supply_cap {
             if c.total_supply >= supply_cap {
-                ic_cdk::trap("Supply cap reached");
+                ic_cdk::trap("supply cap reached");
             }
         }
     });
@@ -138,7 +140,7 @@ pub fn sft_create_token(args: CreateTokenArg) -> Result<Nat, String> {
 pub fn sft_create_token_by_challenge(args: CreateTokenArg) -> Result<Nat, String> {
     let caller = ic_cdk::caller();
     if caller != args.author {
-        ic_cdk::trap("Caller is not the author");
+        ic_cdk::trap("caller is not the author");
     }
 
     let challenge_data = args
@@ -149,7 +151,7 @@ pub fn sft_create_token_by_challenge(args: CreateTokenArg) -> Result<Nat, String
     store::collection::with(|c| {
         if let Some(supply_cap) = c.supply_cap {
             if c.total_supply >= supply_cap {
-                ic_cdk::trap("Supply cap reached");
+                ic_cdk::trap("supply cap reached");
             }
         }
     });
@@ -168,31 +170,29 @@ pub fn sft_create_token_by_challenge(args: CreateTokenArg) -> Result<Nat, String
     create_token(args, hash, now)
 }
 
-/// Update a token before minted.
+// Update a token before minted.
 #[ic_cdk::update(guard = "is_authenticated")]
 pub fn sft_update_token(args: UpdateTokenArg) -> Result<(), String> {
     let caller = ic_cdk::caller();
 
     let id = SftId::from(&args.id);
     let mut token = store::tokens::with(|r| r.get(id.token_index() as u64)).unwrap_or_else(|| {
-        ic_cdk::trap("Token not found");
+        ic_cdk::trap("token not found");
     });
 
     store::collection::with(|c| {
         if !c.managers.contains(&caller) && token.author != caller {
-            ic_cdk::trap("Caller is not a manager or author");
+            ic_cdk::trap("caller is not a manager or author");
         }
     });
 
     if token.total_supply > 0 {
-        ic_cdk::trap("Token has been minted, can not be updated");
+        ic_cdk::trap("token has been minted, can not be updated");
     }
 
     if let Some(supply_cap) = args.supply_cap {
-        if let Some(old_supply_cap) = token.supply_cap {
-            if supply_cap >= old_supply_cap {
-                ic_cdk::trap("Supply cap can not be increased");
-            }
+        if supply_cap >= token.supply_cap.unwrap_or(0) {
+            ic_cdk::trap("supply cap can not be increased");
         }
     }
 
@@ -241,7 +241,7 @@ pub fn sft_update_token(args: UpdateTokenArg) -> Result<(), String> {
 fn create_token(args: CreateTokenArg, hash: [u8; 32], now_sec: u64) -> Result<Nat, String> {
     store::assets::with_mut(|r| {
         if r.contains_key(&hash) {
-            return Err("Asset already exists".to_string());
+            return Err("asset already exists".to_string());
         }
 
         r.insert(hash, args.asset_content.to_vec());
@@ -265,7 +265,7 @@ fn create_token(args: CreateTokenArg, hash: [u8; 32], now_sec: u64) -> Result<Na
             updated_at: now_sec,
         };
         match r.push(&token) {
-            Err(err) => Err(format!("Failed to create token: {}", err)),
+            Err(err) => Err(format!("failed to create token: {}", err)),
             Ok(_) => Ok(Nat::from(id)),
         }
     })?;

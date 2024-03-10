@@ -1,4 +1,29 @@
 type Account = record { owner : principal; subaccount : opt vec nat8 };
+type ApprovalInfo = record {
+  memo : opt vec nat8;
+  from_subaccount : opt vec nat8;
+  created_at_time : opt nat64;
+  expires_at : opt nat64;
+  spender : Account;
+};
+type ApproveCollectionArg = record { approval_info : ApprovalInfo };
+type ApproveCollectionError = variant {
+  GenericError : record { message : text; error_code : nat };
+  InvalidSpender;
+  CreatedInFuture : record { ledger_time : nat64 };
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type ApproveTokenArg = record { token_id : nat; approval_info : ApprovalInfo };
+type ApproveTokenError = variant {
+  GenericError : record { message : text; error_code : nat };
+  InvalidSpender;
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
 type ChallengeArg = record { asset_hash : vec nat8; author : principal };
 type CreateTokenArg = record {
   asset_name : text;
@@ -21,13 +46,18 @@ type InitArg = record {
   description : opt text;
   max_take_value : opt nat16;
   max_update_batch_size : opt nat16;
-  max_approvals_per_token_or_collection : opt nat64;
+  max_approvals_per_token_or_collection : opt nat16;
   max_query_batch_size : opt nat16;
   assets_origin : opt text;
-  max_revoke_approvals : opt nat64;
+  max_revoke_approvals : opt nat16;
   max_memo_size : opt nat16;
   atomic_batch_transfers : opt bool;
   symbol : text;
+};
+type IsApprovedArg = record {
+  token_id : nat;
+  from_subaccount : opt vec nat8;
+  spender : Account;
 };
 type MetadataValue = variant {
   Int : int;
@@ -42,11 +72,46 @@ type MintError = variant {
   GenericBatchError : record { message : text; error_code : nat };
 };
 type Result = variant { Ok; Err : text };
-type Result_1 = variant { Ok : nat; Err : TransferError };
-type Result_2 = variant { Ok : vec nat8; Err : text };
-type Result_3 = variant { Ok : nat; Err : text };
-type Result_4 = variant { Ok : nat; Err : MintError };
+type Result_1 = variant { Ok : nat; Err : ApproveCollectionError };
+type Result_2 = variant { Ok : nat; Err : ApproveTokenError };
+type Result_3 = variant { Ok : nat; Err : RevokeCollectionApprovalError };
+type Result_4 = variant { Ok : nat; Err : RevokeTokenApprovalError };
+type Result_5 = variant { Ok : nat; Err : TransferFromError };
+type Result_6 = variant { Ok : nat; Err : TransferError };
+type Result_7 = variant { Ok : vec nat8; Err : text };
+type Result_8 = variant { Ok : nat; Err : text };
+type Result_9 = variant { Ok : nat; Err : MintError };
+type RevokeCollectionApprovalArg = record {
+  memo : opt vec nat8;
+  from_subaccount : opt vec nat8;
+  created_at_time : opt nat64;
+  spender : opt Account;
+};
+type RevokeCollectionApprovalError = variant {
+  GenericError : record { message : text; error_code : nat };
+  CreatedInFuture : record { ledger_time : nat64 };
+  ApprovalDoesNotExist;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type RevokeTokenApprovalArg = record {
+  token_id : nat;
+  memo : opt vec nat8;
+  from_subaccount : opt vec nat8;
+  created_at_time : opt nat64;
+  spender : opt Account;
+};
+type RevokeTokenApprovalError = variant {
+  GenericError : record { message : text; error_code : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  ApprovalDoesNotExist;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
 type Standard = record { url : text; name : text };
+type TokenApproval = record { token_id : nat; approval_info : ApprovalInfo };
 type TransferArg = record {
   to : Account;
   token_id : nat;
@@ -55,6 +120,24 @@ type TransferArg = record {
   created_at_time : opt nat64;
 };
 type TransferError = variant {
+  GenericError : record { message : text; error_code : nat };
+  Duplicate : record { duplicate_of : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  InvalidRecipient;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type TransferFromArg = record {
+  to : Account;
+  spender_subaccount : opt vec nat8;
+  token_id : nat;
+  from : Account;
+  memo : opt vec nat8;
+  created_at_time : opt nat64;
+};
+type TransferFromError = variant {
   GenericError : record { message : text; error_code : nat };
   Duplicate : record { duplicate_of : nat };
   NonExistingTokenId;
@@ -74,10 +157,10 @@ type UpdateCollectionArg = record {
   description : opt text;
   max_take_value : opt nat16;
   max_update_batch_size : opt nat16;
-  max_approvals_per_token_or_collection : opt nat64;
+  max_approvals_per_token_or_collection : opt nat16;
   max_query_batch_size : opt nat16;
   assets_origin : opt text;
-  max_revoke_approvals : opt nat64;
+  max_revoke_approvals : opt nat16;
   max_memo_size : opt nat16;
   atomic_batch_transfers : opt bool;
 };
@@ -95,9 +178,25 @@ type UpdateTokenArg = record {
 service : (InitArg) -> {
   admin_set_managers : (vec principal) -> (Result);
   admin_set_minters : (vec principal) -> (Result);
+  icrc37_approve_collection : (vec ApproveCollectionArg) -> (vec opt Result_1);
+  icrc37_approve_tokens : (vec ApproveTokenArg) -> (vec opt Result_2);
+  icrc37_get_collection_approvals : (Account, opt ApprovalInfo, opt nat) -> (
+      vec ApprovalInfo,
+    ) query;
+  icrc37_get_token_approvals : (nat, opt TokenApproval, opt nat) -> (
+      vec TokenApproval,
+    ) query;
+  icrc37_is_approved : (vec IsApprovedArg) -> (vec bool) query;
   icrc37_max_approvals_per_token_or_collection : () -> (opt nat) query;
   icrc37_max_revoke_approvals : () -> (opt nat) query;
   icrc37_metadata : () -> (vec record { text; MetadataValue }) query;
+  icrc37_revoke_collection_approvals : (vec RevokeCollectionApprovalArg) -> (
+      vec opt Result_3,
+    );
+  icrc37_revoke_token_approvals : (vec RevokeTokenApprovalArg) -> (
+      vec opt Result_4,
+    );
+  icrc37_transfer_from : (vec TransferFromArg) -> (vec opt Result_5);
   icrc7_atomic_batch_transfers : () -> (opt bool) query;
   icrc7_balance_of : (vec Account) -> (vec nat) query;
   icrc7_collection_metadata : () -> (vec record { text; MetadataValue }) query;
@@ -119,11 +218,11 @@ service : (InitArg) -> {
   icrc7_tokens : (opt nat, opt nat) -> (vec nat) query;
   icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;
   icrc7_total_supply : () -> (nat) query;
-  icrc7_transfer : (vec TransferArg) -> (vec opt Result_1);
-  sft_challenge : (ChallengeArg) -> (Result_2);
-  sft_create_token : (CreateTokenArg) -> (Result_3);
-  sft_create_token_by_challenge : (CreateTokenArg) -> (Result_3);
-  sft_mint : (MintArg) -> (Result_4);
+  icrc7_transfer : (vec TransferArg) -> (vec opt Result_6);
+  sft_challenge : (ChallengeArg) -> (Result_7);
+  sft_create_token : (CreateTokenArg) -> (Result_8);
+  sft_create_token_by_challenge : (CreateTokenArg) -> (Result_8);
+  sft_mint : (MintArg) -> (Result_9);
   sft_tokens_in : (nat, opt nat, opt nat) -> (vec nat) query;
   sft_update_collection : (UpdateCollectionArg) -> (Result);
   sft_update_token : (UpdateTokenArg) -> (Result);
