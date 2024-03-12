@@ -1,4 +1,4 @@
-use candid::{CandidType, Nat, Principal};
+use candid::{Nat, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
