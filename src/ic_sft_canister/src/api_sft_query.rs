@@ -84,6 +84,18 @@ pub fn icrc7_atomic_batch_transfers() -> Option<bool> {
     store::collection::with(|c| Some(c.settings.atomic_batch_transfers))
 }
 
+// Returns the time window in seconds during which transactions can be deduplicated.
+#[ic_cdk::query]
+pub fn icrc7_tx_window() -> Option<Nat> {
+    store::collection::with(|c| Some(c.settings.tx_window.into()))
+}
+
+// Returns the time duration in seconds by which the transaction deduplication window can be extended.
+#[ic_cdk::query]
+pub fn icrc7_permitted_drift() -> Option<Nat> {
+    store::collection::with(|c| Some(c.settings.permitted_drift.into()))
+}
+
 // Returns the token metadata for `token_ids`, a list of token ids.
 #[ic_cdk::query]
 pub fn icrc7_token_metadata(token_ids: Vec<Nat>) -> Vec<Option<Metadata>> {
@@ -254,7 +266,7 @@ pub fn sft_tokens_in(token_id: Nat, prev: Option<Nat>, take: Option<Nat>) -> Vec
 
 // Returns the list of standards this ledger implements.
 #[ic_cdk::query]
-pub fn icrc7_supported_standards() -> Vec<Standard> {
+pub fn icrc61_supported_standards() -> Vec<Standard> {
     vec![
         Standard {
             name: "ICRC-7".into(),
@@ -263,6 +275,10 @@ pub fn icrc7_supported_standards() -> Vec<Standard> {
         Standard {
             name: "ICRC-37".into(),
             url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-37".into(),
+        },
+        Standard {
+            name: "ICRC-61".into(),
+            url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-61".into(),
         },
     ]
 }

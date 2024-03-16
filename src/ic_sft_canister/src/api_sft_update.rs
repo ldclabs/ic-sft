@@ -156,6 +156,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
                     let tx_log = store::Transaction::mint(
                         now_sec,
                         id.to_u64(),
+                        Some(caller),
                         holder,
                         metadata_hash.clone(),
                         None,

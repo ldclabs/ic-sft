@@ -457,7 +457,7 @@ impl HolderTokens {
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct Transaction {
     pub ts: u64,    // in seconds since the epoch (1970-01-01)
-    pub op: String, // "7mint" | "7burn" | "7xfer" | "37appr" | "37appr_coll | "37revoke" | "37revoke_coll" | "37xfer"
+    pub op: String, // "7mint" | "7burn" | "7xfer" | "7update" | "37appr" | "37appr_coll | "37revoke" | "37revoke_coll" | "37xfer"
     pub tid: u64,
     pub from: Option<Principal>,
     pub to: Option<Principal>,
@@ -471,6 +471,7 @@ impl Transaction {
     pub fn mint(
         now_sec: u64,
         tid: u64,
+        from: Option<Principal>,
         to: Principal,
         meta: MetadataValue,
         memo: Option<ByteBuf>,
@@ -479,6 +480,7 @@ impl Transaction {
             ts: now_sec,
             op: "7mint".to_string(),
             tid,
+            from,
             to: Some(to),
             meta: Some(meta),
             memo,
@@ -486,12 +488,19 @@ impl Transaction {
         }
     }
 
-    pub fn burn(now_sec: u64, tid: u64, from: Principal, memo: Option<ByteBuf>) -> Self {
+    pub fn burn(
+        now_sec: u64,
+        tid: u64,
+        from: Principal,
+        to: Option<Principal>,
+        memo: Option<ByteBuf>,
+    ) -> Self {
         Transaction {
             ts: now_sec,
             op: "7burn".to_string(),
             tid,
             from: Some(from),
+            to,
             memo,
             ..Default::default()
         }
@@ -510,6 +519,24 @@ impl Transaction {
             tid,
             from: Some(from),
             to: Some(to),
+            memo,
+            ..Default::default()
+        }
+    }
+
+    pub fn update(
+        now_sec: u64,
+        tid: u64,
+        from: Principal,
+        meta: MetadataValue,
+        memo: Option<ByteBuf>,
+    ) -> Self {
+        Transaction {
+            ts: now_sec,
+            op: "7update".to_string(),
+            tid,
+            from: Some(from),
+            meta: Some(meta),
             memo,
             ..Default::default()
         }

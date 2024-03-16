@@ -197,6 +197,7 @@ service : (InitArg) -> {
       vec opt Result_4,
     );
   icrc37_transfer_from : (vec TransferFromArg) -> (vec opt Result_5);
+  icrc61_supported_standards : () -> (vec Standard) query;
   icrc7_atomic_batch_transfers : () -> (opt bool) query;
   icrc7_balance_of : (vec Account) -> (vec nat) query;
   icrc7_collection_metadata : () -> (vec record { text; MetadataValue }) query;
@@ -209,8 +210,8 @@ service : (InitArg) -> {
   icrc7_max_update_batch_size : () -> (opt nat) query;
   icrc7_name : () -> (text) query;
   icrc7_owner_of : (vec nat) -> (vec opt Account) query;
+  icrc7_permitted_drift : () -> (opt nat) query;
   icrc7_supply_cap : () -> (opt nat) query;
-  icrc7_supported_standards : () -> (vec Standard) query;
   icrc7_symbol : () -> (text) query;
   icrc7_token_metadata : (vec nat) -> (
       vec opt vec record { text; MetadataValue },
@@ -219,6 +220,7 @@ service : (InitArg) -> {
   icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;
   icrc7_total_supply : () -> (nat) query;
   icrc7_transfer : (vec TransferArg) -> (vec opt Result_6);
+  icrc7_tx_window : () -> (opt nat) query;
   sft_challenge : (ChallengeArg) -> (Result_7);
   sft_create_token : (CreateTokenArg) -> (Result_8);
   sft_create_token_by_challenge : (CreateTokenArg) -> (Result_8);
