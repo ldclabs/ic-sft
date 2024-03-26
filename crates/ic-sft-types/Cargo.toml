@@ -1,0 +1,18 @@
+[package]
+name = "ic-sft-types"
+version = "0.1.0"
+edition = "2021"
+description = "Types for interacting with implementation of the SFT (Semi-Fungible Token, implemented ICRC-3, ICRC-7, ICRC-37)"
+publish = true
+repository = "https://github.com/ldclabs/ic-sft/tree/main/crates/ic-sft-types"
+license = "BSD-2-Clause"
+
+[lib]
+
+[dependencies]
+candid = { workspace = true }
+ic-ledger-types = { workspace = true }
+icrc-ledger-types = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+num-traits = { workspace = true }

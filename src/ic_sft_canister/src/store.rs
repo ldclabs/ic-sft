@@ -1,11 +1,15 @@
 use candid::{Nat, Principal};
 use ciborium::{from_reader, into_writer};
+use ic_sft_types::{
+    ApprovalInfo, ApproveTokenError, Memo, Metadata, RevokeCollectionApprovalError,
+    RevokeCollectionApprovalResult, RevokeTokenApprovalError, SftId, TransferError,
+    TransferFromError, Value,
+};
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     storable::Bound,
     DefaultMemoryImpl, StableBTreeMap, StableCell, StableLog, StableVec, Storable,
 };
-use icrc_ledger_types::icrc::generic_metadata_value::MetadataValue;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -13,12 +17,6 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
-};
-
-use crate::types::{
-    ApprovalInfo, ApproveTokenError, Metadata, RevokeCollectionApprovalError,
-    RevokeCollectionApprovalResult, RevokeTokenApprovalError, SftId, TransferError,
-    TransferFromError,
 };
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -33,7 +31,7 @@ const TRANSACTIONS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6);
 const TRANSACTIONS_DATA_MEMORY_ID: MemoryId = MemoryId::new(7);
 
 thread_local! {
-    static CHALLENGE_SECRET: RefCell<[u8; 32]> = RefCell::new([0; 32]);
+    static CHALLENGE_SECRET: RefCell<[u8; 32]> = const { RefCell::new([0; 32]) };
 
     static COLLECTION_HEAP: RefCell<Collection> = RefCell::new(Collection::default());
 
@@ -133,17 +131,26 @@ impl Storable for Collection {
 impl Collection {
     pub fn metadata(&self) -> Metadata {
         let mut res = Metadata::new();
-        res.insert("icrc7:symbol".to_string(), self.symbol.as_str().into());
-        res.insert("icrc7:name".to_string(), self.name.as_str().into());
+        res.insert("icrc7:symbol".to_string(), Value::Text(self.symbol.clone()));
+        res.insert("icrc7:name".to_string(), Value::Text(self.name.clone()));
         if let Some(ref description) = self.description {
-            res.insert("icrc7:description".to_string(), description.as_str().into());
+            res.insert(
+                "icrc7:description".to_string(),
+                Value::Text(description.clone()),
+            );
         }
         if let Some(ref logo) = self.logo {
-            res.insert("icrc7:logo".to_string(), logo.as_str().into());
+            res.insert("icrc7:logo".to_string(), Value::Text(logo.clone()));
         }
-        res.insert("icrc7:total_supply".to_string(), self.total_supply.into());
+        res.insert(
+            "icrc7:total_supply".to_string(),
+            Value::Nat(self.total_supply.into()),
+        );
         if let Some(supply_cap) = self.supply_cap {
-            res.insert("icrc7:supply_cap".to_string(), supply_cap.into());
+            res.insert(
+                "icrc7:supply_cap".to_string(),
+                Value::Nat(supply_cap.into()),
+            );
         }
         res
     }
@@ -153,13 +160,13 @@ impl Collection {
         if self.settings.max_approvals_per_token_or_collection > 0 {
             res.insert(
                 "icrc37:max_approvals_per_token_or_collection".to_string(),
-                (self.settings.max_approvals_per_token_or_collection as u64).into(),
+                Value::Nat((self.settings.max_approvals_per_token_or_collection as u64).into()),
             );
         }
         if self.settings.max_revoke_approvals > 0 {
             res.insert(
                 "icrc37:max_revoke_approvals".to_string(),
-                (self.settings.max_revoke_approvals as u64).into(),
+                Value::Nat((self.settings.max_revoke_approvals as u64).into()),
             );
         }
         res
@@ -174,7 +181,7 @@ pub struct Token {
     pub asset_name: String,
     pub asset_content_type: String,
     pub asset_hash: [u8; 32],
-    pub metadata: BTreeMap<String, MetadataValue>,
+    pub metadata: Metadata,
     pub author: Principal,
     pub supply_cap: Option<u32>,
     pub total_supply: u32,
@@ -199,16 +206,25 @@ impl Storable for Token {
 impl Token {
     pub fn metadata(&self) -> Metadata {
         let mut res = self.metadata.clone();
-        res.insert("icrc7:name".to_string(), self.name.as_str().into());
+        res.insert("icrc7:name".to_string(), Value::Text(self.name.clone()));
         if let Some(ref description) = self.description {
-            res.insert("icrc7:description".to_string(), description.as_str().into());
+            res.insert(
+                "icrc7:description".to_string(),
+                Value::Text(description.clone()),
+            );
         }
-        res.insert("asset_name".to_string(), self.asset_name.as_str().into());
+        res.insert(
+            "asset_name".to_string(),
+            Value::Text(self.asset_name.clone()),
+        );
         res.insert(
             "asset_content_type".to_string(),
-            self.asset_content_type.as_str().into(),
+            Value::Text(self.asset_content_type.clone()),
         );
-        res.insert("asset_hash".to_string(), self.asset_hash.as_slice().into());
+        res.insert(
+            "asset_hash".to_string(),
+            Value::Blob(ByteBuf::from(self.asset_hash.as_slice())),
+        );
         res
     }
 }
@@ -463,8 +479,8 @@ pub struct Transaction {
     pub to: Option<Principal>,
     pub spender: Option<Principal>,
     pub exp: Option<u64>,
-    pub meta: Option<MetadataValue>,
-    pub memo: Option<ByteBuf>,
+    pub meta: Option<Metadata>,
+    pub memo: Option<Memo>,
 }
 
 impl Transaction {
@@ -473,8 +489,8 @@ impl Transaction {
         tid: u64,
         from: Option<Principal>,
         to: Principal,
-        meta: MetadataValue,
-        memo: Option<ByteBuf>,
+        meta: Metadata,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -493,7 +509,7 @@ impl Transaction {
         tid: u64,
         from: Principal,
         to: Option<Principal>,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -511,7 +527,7 @@ impl Transaction {
         tid: u64,
         from: Principal,
         to: Principal,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -528,8 +544,8 @@ impl Transaction {
         now_sec: u64,
         tid: u64,
         from: Principal,
-        meta: MetadataValue,
-        memo: Option<ByteBuf>,
+        meta: Metadata,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -548,7 +564,7 @@ impl Transaction {
         from: Principal,
         spender: Principal,
         exp_sec: Option<u64>,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -567,7 +583,7 @@ impl Transaction {
         from: Principal,
         spender: Principal,
         exp_sec: Option<u64>,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -585,7 +601,7 @@ impl Transaction {
         tid: u64,
         from: Principal,
         spender: Option<Principal>,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -602,7 +618,7 @@ impl Transaction {
         now_sec: u64,
         from: Principal,
         spender: Option<Principal>,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,
@@ -620,7 +636,7 @@ impl Transaction {
         from: Principal,
         to: Principal,
         spender: Principal,
-        memo: Option<ByteBuf>,
+        memo: Option<Memo>,
     ) -> Self {
         Transaction {
             ts: now_sec,

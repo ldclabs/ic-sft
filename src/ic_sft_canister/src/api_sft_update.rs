@@ -1,7 +1,7 @@
+use crate::schema::Validate;
+use crate::{is_authenticated, store, SECOND};
 use candid::{Nat, Principal};
-use icrc_ledger_types::icrc::generic_metadata_value::MetadataValue;
-
-use crate::types::{
+use ic_sft_types::{
     ApproveCollectionArg, ApproveCollectionError, ApproveCollectionResult, ApproveTokenArg,
     ApproveTokenError, ApproveTokenResult, MintArg, MintError, MintResult,
     RevokeCollectionApprovalArg, RevokeCollectionApprovalError, RevokeCollectionApprovalResult,
@@ -9,8 +9,6 @@ use crate::types::{
     TransferArg, TransferError, TransferFromArg, TransferFromError, TransferFromResult,
     TransferResult,
 };
-use crate::utils::{sha3_256, to_cbor_bytes};
-use crate::{is_authenticated, store, SECOND};
 
 // Performs a batch of token transfers.
 #[ic_cdk::update(guard = "is_authenticated")]
@@ -126,7 +124,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
     }
 
     let id = SftId::from(&args.token_id);
-    let metadata_hash = store::tokens::with(|r| {
+    let metadata = store::tokens::with(|r| {
         if let Some(token) = r.get(id.token_index() as u64) {
             if let Some(supply_cap) = token.supply_cap {
                 if token.total_supply.saturating_add(args.holders.len() as u32) >= supply_cap {
@@ -134,10 +132,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
                 }
             }
 
-            let data = token.metadata();
-            let data = to_cbor_bytes(&data);
-            let data = sha3_256(&data);
-            Ok(MetadataValue::from(&data[..]))
+            Ok(token.metadata())
         } else {
             Err(MintError::NonExistingTokenId)
         }
@@ -158,7 +153,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
                         id.to_u64(),
                         Some(caller),
                         holder,
-                        metadata_hash.clone(),
+                        metadata.clone(),
                         None,
                     );
 

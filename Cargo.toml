@@ -1,3 +1,12 @@
 [workspace]
-members = ["src/ic_sft_canister"]
+members = ["src/ic_sft_canister", "crates/ic-sft-types"]
 resolver = "2"
+
+[workspace.dependencies]
+candid = "0.10"
+ciborium = "0.2"
+ic-ledger-types = "0.10"
+icrc-ledger-types = "0.1"
+serde = "1"
+serde_bytes = "0.11"
+num-traits = "0.2"

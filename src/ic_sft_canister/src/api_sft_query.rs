@@ -1,9 +1,10 @@
-use candid::{Nat, Principal};
-use icrc_ledger_types::icrc1::account::Account;
-
 use crate::store;
-use crate::types::{CollectionApproval, IsApprovedArg, Metadata, SftId, Standard, TokenApproval};
-use crate::{nat_to_u64, ANONYMOUS, SECOND};
+use crate::{ANONYMOUS, SECOND};
+use candid::{Nat, Principal};
+use ic_sft_types::{
+    nat_to_u64, CollectionApproval, IsApprovedArg, Metadata, SftId, Standard, TokenApproval,
+};
+use icrc_ledger_types::icrc1::account::Account;
 
 // Returns all the collection-level metadata of the NFT collection in a single query.
 #[ic_cdk::query]

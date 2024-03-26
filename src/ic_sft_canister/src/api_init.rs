@@ -1,4 +1,5 @@
-use crate::{store, types::InitArg, utils::mac_256, SECOND};
+use crate::{store, utils::mac_256, SECOND};
+use ic_sft_types::InitArg;
 use std::time::Duration;
 
 #[ic_cdk::init]

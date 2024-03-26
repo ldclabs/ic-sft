@@ -1,10 +1,9 @@
+use crate::utils::{sha3_256, Challenge};
+use crate::{is_authenticated, is_controller, store, SECOND};
 use candid::{Nat, Principal};
+use ic_sft_types::{ChallengeArg, CreateTokenArg, SftId, UpdateCollectionArg, UpdateTokenArg};
 use serde_bytes::ByteBuf;
 use std::collections::BTreeSet;
-
-use crate::types::{ChallengeArg, CreateTokenArg, UpdateCollectionArg, UpdateTokenArg};
-use crate::utils::{sha3_256, Challenge};
-use crate::{is_authenticated, is_controller, store, SftId, SECOND};
 
 // Set the minters.
 #[ic_cdk::update(guard = "is_controller")]
