@@ -2,7 +2,8 @@ use crate::store;
 use crate::{ANONYMOUS, SECOND};
 use candid::{Nat, Principal};
 use ic_sft_types::{
-    nat_to_u64, CollectionApproval, IsApprovedArg, Metadata, SftId, Standard, TokenApproval,
+    nat_to_u64, CollectionApproval, IsApprovedArg, Metadata, SftId, SupportedStandard,
+    TokenApproval,
 };
 use icrc_ledger_types::icrc1::account::Account;
 
@@ -267,19 +268,23 @@ pub fn sft_tokens_in(token_id: Nat, prev: Option<Nat>, take: Option<Nat>) -> Vec
 
 // Returns the list of standards this ledger implements.
 #[ic_cdk::query]
-pub fn icrc61_supported_standards() -> Vec<Standard> {
+pub fn icrc10_supported_standards() -> Vec<SupportedStandard> {
     vec![
-        Standard {
+        SupportedStandard {
+            name: "ICRC-3".to_string(),
+            url: "https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-3".to_string(),
+        },
+        SupportedStandard {
             name: "ICRC-7".into(),
             url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-7".into(),
         },
-        Standard {
+        SupportedStandard {
+            name: "ICRC-10".into(),
+            url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-10".into(),
+        },
+        SupportedStandard {
             name: "ICRC-37".into(),
             url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-37".into(),
-        },
-        Standard {
-            name: "ICRC-61".into(),
-            url: "https://github.com/dfinity/ICRC/tree/main/ICRCs/ICRC-61".into(),
         },
     ]
 }

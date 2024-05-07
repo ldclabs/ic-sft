@@ -1,6 +1,6 @@
 [package]
 name = "ic-sft-types"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Types for interacting with implementation of the SFT (Semi-Fungible Token, implemented ICRC-3, ICRC-7, ICRC-37)"
 publish = true
@@ -16,3 +16,5 @@ icrc-ledger-types = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 num-traits = { workspace = true }
+ic-stable-structures = { workspace = true }
+ciborium = { workspace = true }

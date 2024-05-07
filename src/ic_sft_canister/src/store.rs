@@ -1,7 +1,7 @@
 use candid::{Nat, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_sft_types::{
-    ApprovalInfo, ApproveTokenError, Memo, Metadata, RevokeCollectionApprovalError,
+    ApprovalInfo, ApproveTokenError, Metadata, RevokeCollectionApprovalError,
     RevokeCollectionApprovalResult, RevokeTokenApprovalError, SftId, TransferError,
     TransferFromError, Value,
 };
@@ -10,7 +10,7 @@ use ic_stable_structures::{
     storable::Bound,
     DefaultMemoryImpl, StableBTreeMap, StableCell, StableLog, StableVec, Storable,
 };
-use icrc_ledger_types::icrc1::account::Account;
+use icrc_ledger_types::{icrc::generic_value::Hash, icrc1::account::Account};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use std::{
@@ -18,6 +18,8 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
 };
+
+use ic_sft_types::{Block, Transaction};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -27,8 +29,8 @@ const HOLDERS_MEMORY_ID: MemoryId = MemoryId::new(2);
 const HOLDER_TOKENS_MEMORY_ID: MemoryId = MemoryId::new(3);
 const HOLDER_APPROVALS_MEMORY_ID: MemoryId = MemoryId::new(4);
 const ASSETS_MEMORY_ID: MemoryId = MemoryId::new(5);
-const TRANSACTIONS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6);
-const TRANSACTIONS_DATA_MEMORY_ID: MemoryId = MemoryId::new(7);
+const BLOCKS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6);
+const BLOCKS_DATA_MEMORY_ID: MemoryId = MemoryId::new(7);
 
 thread_local! {
     static CHALLENGE_SECRET: RefCell<[u8; 32]> = const { RefCell::new([0; 32]) };
@@ -75,11 +77,11 @@ thread_local! {
         )
     );
 
-    static TRANSACTIONS: RefCell<StableLog<Transaction, Memory, Memory>> = RefCell::new(
+    static BLOCKS: RefCell<StableLog<Block, Memory, Memory>> = RefCell::new(
         StableLog::init(
-            MEMORY_MANAGER.with_borrow(|m| m.get(TRANSACTIONS_INDEX_MEMORY_ID)),
-            MEMORY_MANAGER.with_borrow(|m| m.get(TRANSACTIONS_DATA_MEMORY_ID)),
-        ).expect("failed to init TRANSACTIONS store")
+            MEMORY_MANAGER.with_borrow(|m| m.get(BLOCKS_INDEX_MEMORY_ID)),
+            MEMORY_MANAGER.with_borrow(|m| m.get(BLOCKS_DATA_MEMORY_ID)),
+        ).expect("failed to init BLOCKS store")
     );
 }
 
@@ -94,6 +96,8 @@ pub struct Collection {
     pub supply_cap: Option<u64>,
     pub created_at: u64,
     pub updated_at: u64,
+    pub last_block_index: Option<u64>,
+    pub last_block_hash: Option<Hash>,
 
     pub minters: BTreeSet<Principal>,
     pub managers: BTreeSet<Principal>,
@@ -470,201 +474,6 @@ impl HolderTokens {
     }
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
-pub struct Transaction {
-    pub ts: u64,    // in seconds since the epoch (1970-01-01)
-    pub op: String, // "7mint" | "7burn" | "7xfer" | "7update" | "37appr" | "37appr_coll | "37revoke" | "37revoke_coll" | "37xfer"
-    pub tid: u64,
-    pub from: Option<Principal>,
-    pub to: Option<Principal>,
-    pub spender: Option<Principal>,
-    pub exp: Option<u64>,
-    pub meta: Option<Metadata>,
-    pub memo: Option<Memo>,
-}
-
-impl Transaction {
-    pub fn mint(
-        now_sec: u64,
-        tid: u64,
-        from: Option<Principal>,
-        to: Principal,
-        meta: Metadata,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "7mint".to_string(),
-            tid,
-            from,
-            to: Some(to),
-            meta: Some(meta),
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn burn(
-        now_sec: u64,
-        tid: u64,
-        from: Principal,
-        to: Option<Principal>,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "7burn".to_string(),
-            tid,
-            from: Some(from),
-            to,
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn transfer(
-        now_sec: u64,
-        tid: u64,
-        from: Principal,
-        to: Principal,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "7xfer".to_string(),
-            tid,
-            from: Some(from),
-            to: Some(to),
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn update(
-        now_sec: u64,
-        tid: u64,
-        from: Principal,
-        meta: Metadata,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "7update".to_string(),
-            tid,
-            from: Some(from),
-            meta: Some(meta),
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn approve(
-        now_sec: u64,
-        tid: u64,
-        from: Principal,
-        spender: Principal,
-        exp_sec: Option<u64>,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "37appr".to_string(),
-            tid,
-            from: Some(from),
-            spender: Some(spender),
-            exp: exp_sec,
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn approve_collection(
-        now_sec: u64,
-        from: Principal,
-        spender: Principal,
-        exp_sec: Option<u64>,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "37appr_coll".to_string(),
-            from: Some(from),
-            spender: Some(spender),
-            exp: exp_sec,
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn revoke(
-        now_sec: u64,
-        tid: u64,
-        from: Principal,
-        spender: Option<Principal>,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "37revoke".to_string(),
-            tid,
-            from: Some(from),
-            spender,
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn revoke_collection(
-        now_sec: u64,
-        from: Principal,
-        spender: Option<Principal>,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "37revoke_coll".to_string(),
-            from: Some(from),
-            spender,
-            memo,
-            ..Default::default()
-        }
-    }
-
-    pub fn transfer_from(
-        now_sec: u64,
-        tid: u64,
-        from: Principal,
-        to: Principal,
-        spender: Principal,
-        memo: Option<Memo>,
-    ) -> Self {
-        Transaction {
-            ts: now_sec,
-            op: "37xfer".to_string(),
-            tid,
-            from: Some(from),
-            to: Some(to),
-            spender: Some(spender),
-            memo,
-            ..Default::default()
-        }
-    }
-}
-
-impl Storable for Transaction {
-    const BOUND: Bound = Bound::Unbounded;
-
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode Transaction data");
-        Cow::Owned(buf)
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode Transaction data")
-    }
-}
-
 pub mod challenge {
     use super::*;
 
@@ -939,17 +748,23 @@ pub mod approvals {
     }
 }
 
-pub mod transactions {
+pub mod blocks {
     use super::*;
 
     pub fn total() -> u64 {
-        TRANSACTIONS.with(|r| r.borrow().len())
+        BLOCKS.with(|r| r.borrow().len())
     }
 
-    pub fn append(tx: &Transaction) -> Result<u64, String> {
-        TRANSACTIONS
-            .with(|r| r.borrow_mut().append(tx))
-            .map_err(|err| format!("failed to append transaction log, error {:?}", err))
+    pub fn append(tx: Transaction) -> Result<u64, String> {
+        collection::with_mut(|c| {
+            let blk = Block::new(c.last_block_hash, tx);
+            let i = BLOCKS
+                .with(|r| r.borrow_mut().append(&blk))
+                .map_err(|err| format!("failed to append transaction log, error {:?}", err))?;
+            c.last_block_index = Some(i);
+            c.last_block_hash = Some(blk.hash());
+            Ok(i)
+        })
     }
 }
 

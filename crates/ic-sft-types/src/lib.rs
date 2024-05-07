@@ -1,5 +1,5 @@
 use candid::{CandidType, Nat, Principal};
-use icrc_ledger_types::{icrc::generic_value::Map, icrc1::account::Account};
+use icrc_ledger_types::icrc::generic_value::{ICRC3Map, ICRC3Value};
 use num_traits::cast::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -9,9 +9,9 @@ pub mod icrc3;
 pub mod icrc37;
 pub mod icrc7;
 
-pub type Metadata = Map;
+pub type Metadata = ICRC3Map;
+pub type Value = ICRC3Value;
 
-pub use icrc_ledger_types::icrc::generic_value::Value;
 pub use icrc_ledger_types::icrc1::transfer::Memo;
 
 pub use icrc3::*;
@@ -129,12 +129,6 @@ pub struct UpdateTokenArg {
     pub author: Option<Principal>,
 }
 
-#[derive(CandidType, Serialize)]
-pub struct Standard {
-    pub name: String,
-    pub url: String,
-}
-
 #[derive(CandidType, Deserialize, Clone)]
 pub struct MintArg {
     pub token_id: Nat,
@@ -150,15 +144,8 @@ pub enum MintError {
 
 pub type MintResult = Result<Nat, MintError>;
 
-#[derive(CandidType, Serialize, Clone)]
-pub struct Transaction {
-    pub ts: Nat,    // in Nanoseconds
-    pub op: String, // "7mint" | "7burn" | "7xfer" | "37appr" | "37appr_coll | "37revoke" | "37revoke_coll" | "37xfer"
-    pub tid: Nat,
-    pub from: Option<Account>,
-    pub to: Option<Account>,
-    pub spender: Option<Account>,
-    pub exp: Option<Nat>,
-    pub meta: Option<Metadata>,
-    pub memo: Option<ByteBuf>,
+#[derive(CandidType, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct SupportedStandard {
+    pub name: String,
+    pub url: String,
 }

@@ -4,12 +4,6 @@ use icrc_ledger_types::icrc1::account::{Account, Subaccount};
 use serde::{Deserialize, Serialize};
 use std::string::ToString;
 
-#[derive(CandidType, Serialize)]
-pub struct Standard {
-    pub name: String,
-    pub url: String,
-}
-
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct TransferArg {
     pub from_subaccount: Option<Subaccount>,

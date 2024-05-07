@@ -1,4 +1,4 @@
-use crate::{Memo, Metadata};
+use crate::Memo;
 use candid::{CandidType, Nat};
 use icrc_ledger_types::icrc1::account::{Account, Subaccount};
 use serde::{Deserialize, Serialize};
@@ -127,16 +127,3 @@ pub enum TransferFromError {
 }
 
 pub type TransferFromResult = Result<Nat, TransferFromError>;
-
-#[derive(CandidType, Serialize, Clone)]
-pub struct Transaction {
-    pub ts: Nat,    // in Nanoseconds
-    pub op: String, // "7mint" | "7burn" | "7xfer" | "37appr" | "37appr_coll | "37revoke" | "37revoke_coll" | "37xfer"
-    pub tid: Nat,
-    pub from: Option<Account>,
-    pub to: Option<Account>,
-    pub spender: Option<Account>,
-    pub exp: Option<Nat>,
-    pub meta: Option<Metadata>,
-    pub memo: Option<Memo>,
-}

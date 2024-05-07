@@ -6,8 +6,8 @@ use ic_sft_types::{
     ApproveTokenError, ApproveTokenResult, MintArg, MintError, MintResult,
     RevokeCollectionApprovalArg, RevokeCollectionApprovalError, RevokeCollectionApprovalResult,
     RevokeTokenApprovalArg, RevokeTokenApprovalError, RevokeTokenApprovalResult, SftId,
-    TransferArg, TransferError, TransferFromArg, TransferFromError, TransferFromResult,
-    TransferResult,
+    Transaction, TransferArg, TransferError, TransferFromArg, TransferFromError,
+    TransferFromResult, TransferResult,
 };
 
 // Performs a batch of token transfers.
@@ -66,15 +66,15 @@ pub fn icrc7_transfer(args: Vec<TransferArg>) -> Vec<Option<TransferResult>> {
                 }
                 Some(mut holders) => match holders.transfer_to(&caller, &arg.to.owner, id.1) {
                     Ok(_) => {
-                        let tx_log = store::Transaction::transfer(
-                            now / SECOND,
+                        let tx_log = Transaction::transfer(
+                            now,
                             id.to_u64(),
                             caller,
                             arg.to.owner,
                             arg.memo.clone(),
                         );
 
-                        match store::transactions::append(&tx_log) {
+                        match store::blocks::append(tx_log) {
                             Ok(idx) => {
                                 res[index] = Some(Ok(Nat::from(idx)));
                                 r.insert(id.0, holders);
@@ -138,7 +138,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
         }
     })?;
 
-    let now_sec = ic_cdk::api::time() / SECOND;
+    let now = ic_cdk::api::time();
     store::holders::with_mut(|r| {
         match r.get(&id.0) {
             None => Err(MintError::NonExistingTokenId),
@@ -148,8 +148,8 @@ pub fn sft_mint(args: MintArg) -> MintResult {
                 for holder in args.holders {
                     holders.append(holder);
 
-                    let tx_log = store::Transaction::mint(
-                        now_sec,
+                    let tx_log = Transaction::mint(
+                        now,
                         id.to_u64(),
                         Some(caller),
                         holder,
@@ -157,7 +157,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
                         None,
                     );
 
-                    match store::transactions::append(&tx_log) {
+                    match store::blocks::append(tx_log) {
                         Ok(idx) => block_idx = idx,
                         Err(err) => {
                             // break up when append log failed.
@@ -174,7 +174,7 @@ pub fn sft_mint(args: MintArg) -> MintResult {
                     let idx = id.token_index() as u64;
                     if let Some(mut token) = r.get(idx) {
                         token.total_supply += added_holders;
-                        token.updated_at = now_sec;
+                        token.updated_at = now / SECOND;
                         r.set(idx, &token);
                     }
                 });
@@ -223,8 +223,8 @@ pub fn icrc37_approve_tokens(args: Vec<ApproveTokenArg>) -> Vec<Option<ApproveTo
                         arg.approval_info.expires_at.unwrap_or_default() / SECOND,
                     ) {
                         Ok(_) => {
-                            let tx_log = store::Transaction::approve(
-                                now / SECOND,
+                            let tx_log = Transaction::approve(
+                                now,
                                 id.to_u64(),
                                 caller,
                                 arg.approval_info.spender.owner,
@@ -232,7 +232,7 @@ pub fn icrc37_approve_tokens(args: Vec<ApproveTokenArg>) -> Vec<Option<ApproveTo
                                 arg.approval_info.memo.to_owned(),
                             );
 
-                            match store::transactions::append(&tx_log) {
+                            match store::blocks::append(tx_log) {
                                 Ok(idx) => {
                                     res[index] = Some(Ok(Nat::from(idx)));
                                 }
@@ -307,15 +307,15 @@ pub fn icrc37_approve_collection(
                 );
                 total += 1;
 
-                let tx_log = store::Transaction::approve_collection(
-                    now / SECOND,
+                let tx_log = Transaction::approve_collection(
+                    now,
                     caller,
                     arg.approval_info.spender.owner,
                     arg.approval_info.expires_at,
                     arg.approval_info.memo.to_owned(),
                 );
 
-                match store::transactions::append(&tx_log) {
+                match store::blocks::append(tx_log) {
                     Ok(idx) => {
                         res[index] = Some(Ok(Nat::from(idx)));
                     }
@@ -375,15 +375,15 @@ pub fn icrc37_revoke_token_approvals(
                             res[index] = Some(Err(err));
                         }
                         Ok(_) => {
-                            let tx_log = store::Transaction::revoke(
-                                now / SECOND,
+                            let tx_log = Transaction::revoke(
+                                now,
                                 id.to_u64(),
                                 caller,
                                 spender,
                                 arg.memo.to_owned(),
                             );
 
-                            match store::transactions::append(&tx_log) {
+                            match store::blocks::append(tx_log) {
                                 Ok(idx) => {
                                     res[index] = Some(Ok(Nat::from(idx)));
                                 }
@@ -447,14 +447,14 @@ pub fn icrc37_revoke_collection_approvals(
                 res[idx] = Some(val.to_owned());
             }
             None => {
-                let tx_log = store::Transaction::revoke_collection(
-                    now / SECOND,
+                let tx_log = Transaction::revoke_collection(
+                    now,
                     caller,
                     spenders[i],
                     args[idx].memo.to_owned(),
                 );
 
-                match store::transactions::append(&tx_log) {
+                match store::blocks::append(tx_log) {
                     Ok(block_idx) => {
                         res[idx] = Some(Ok(Nat::from(block_idx)));
                     }
@@ -534,8 +534,8 @@ pub fn icrc37_transfer_from(args: Vec<TransferFromArg>) -> Vec<Option<TransferFr
                 Some(mut holders) => {
                     match holders.transfer_from(&arg.from.owner, &arg.to.owner, id.1) {
                         Ok(_) => {
-                            let tx_log = store::Transaction::transfer_from(
-                                now / SECOND,
+                            let tx_log = Transaction::transfer_from(
+                                now,
                                 id.to_u64(),
                                 arg.from.owner,
                                 arg.to.owner,
@@ -543,7 +543,7 @@ pub fn icrc37_transfer_from(args: Vec<TransferFromArg>) -> Vec<Option<TransferFr
                                 arg.memo.clone(),
                             );
 
-                            match store::transactions::append(&tx_log) {
+                            match store::blocks::append(tx_log) {
                                 Ok(idx) => {
                                     res[index] = Some(Ok(Nat::from(idx)));
                                     r.insert(id.0, holders);

@@ -29,12 +29,20 @@ type CreateTokenArg = record {
   asset_name : text;
   supply_cap : opt nat32;
   challenge : opt blob;
-  metadata : vec record { text; Value };
+  metadata : vec record { text; ICRC3Value };
   name : text;
   description : opt text;
   author : principal;
   asset_content_type : text;
   asset_content : blob;
+};
+type ICRC3Value = variant {
+  Int : int;
+  Map : vec record { text; ICRC3Value };
+  Nat : nat;
+  Blob : blob;
+  Text : text;
+  Array : vec ICRC3Value;
 };
 type InitArg = record {
   supply_cap : opt nat64;
@@ -104,7 +112,7 @@ type RevokeTokenApprovalError = variant {
   GenericBatchError : record { message : text; error_code : nat };
   TooOld;
 };
-type Standard = record { url : text; name : text };
+type SupportedStandard = record { url : text; name : text };
 type TokenApproval = record { token_id : nat; approval_info : ApprovalInfo };
 type TransferArg = record {
   to : Account;
@@ -162,25 +170,17 @@ type UpdateTokenArg = record {
   id : nat;
   asset_name : opt text;
   supply_cap : opt nat32;
-  metadata : opt vec record { text; Value };
+  metadata : opt vec record { text; ICRC3Value };
   name : opt text;
   description : opt text;
   author : opt principal;
   asset_content_type : opt text;
   asset_content : opt blob;
 };
-type Value = variant {
-  Int : int;
-  Map : vec record { text; Value };
-  Nat : nat;
-  Nat64 : nat64;
-  Blob : blob;
-  Text : text;
-  Array : vec Value;
-};
 service : (InitArg) -> {
   admin_set_managers : (vec principal) -> (Result);
   admin_set_minters : (vec principal) -> (Result);
+  icrc10_supported_standards : () -> (vec SupportedStandard) query;
   icrc37_approve_collection : (vec ApproveCollectionArg) -> (vec opt Result_1);
   icrc37_approve_tokens : (vec ApproveTokenArg) -> (vec opt Result_2);
   icrc37_get_collection_approvals : (Account, opt ApprovalInfo, opt nat) -> (
@@ -192,7 +192,7 @@ service : (InitArg) -> {
   icrc37_is_approved : (vec IsApprovedArg) -> (vec bool) query;
   icrc37_max_approvals_per_token_or_collection : () -> (opt nat) query;
   icrc37_max_revoke_approvals : () -> (opt nat) query;
-  icrc37_metadata : () -> (vec record { text; Value }) query;
+  icrc37_metadata : () -> (vec record { text; ICRC3Value }) query;
   icrc37_revoke_collection_approvals : (vec RevokeCollectionApprovalArg) -> (
       vec opt Result_3,
     );
@@ -200,10 +200,9 @@ service : (InitArg) -> {
       vec opt Result_4,
     );
   icrc37_transfer_from : (vec TransferFromArg) -> (vec opt Result_5);
-  icrc61_supported_standards : () -> (vec Standard) query;
   icrc7_atomic_batch_transfers : () -> (opt bool) query;
   icrc7_balance_of : (vec Account) -> (vec nat) query;
-  icrc7_collection_metadata : () -> (vec record { text; Value }) query;
+  icrc7_collection_metadata : () -> (vec record { text; ICRC3Value }) query;
   icrc7_default_take_value : () -> (opt nat) query;
   icrc7_description : () -> (opt text) query;
   icrc7_logo : () -> (opt text) query;
@@ -217,7 +216,7 @@ service : (InitArg) -> {
   icrc7_supply_cap : () -> (opt nat) query;
   icrc7_symbol : () -> (text) query;
   icrc7_token_metadata : (vec nat) -> (
-      vec opt vec record { text; Value },
+      vec opt vec record { text; ICRC3Value },
     ) query;
   icrc7_tokens : (opt nat, opt nat) -> (vec nat) query;
   icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;
