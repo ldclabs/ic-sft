@@ -1,4 +1,4 @@
-use crate::{store, utils::mac_256, SECOND};
+use crate::{store, SECOND};
 use ic_sft_types::InitArg;
 use std::time::Duration;
 
@@ -28,27 +28,22 @@ pub fn init(args: InitArg) {
     });
 
     store::collection::save();
-
-    ic_cdk_timers::set_timer(Duration::from_nanos(0), || ic_cdk::spawn(load_secret()));
+    ic_cdk_timers::set_timer(Duration::from_nanos(0), || {
+        ic_cdk::spawn(store::keys::load())
+    });
 }
 
 #[ic_cdk::pre_upgrade]
 pub fn pre_upgrade() {
     store::collection::save();
+    store::keys::save();
 }
 
 #[ic_cdk::post_upgrade]
 pub fn post_upgrade() {
     store::collection::load();
 
-    ic_cdk_timers::set_timer(Duration::from_nanos(0), || ic_cdk::spawn(load_secret()));
-}
-
-async fn load_secret() {
-    // can't be used in `init` and `post_upgrade`
-    let rr = ic_cdk::api::management_canister::main::raw_rand()
-        .await
-        .expect("failed to get random bytes");
-
-    store::challenge::set_secret(mac_256(&rr.0, b"CHALLENGE_SECRET"));
+    ic_cdk_timers::set_timer(Duration::from_nanos(0), || {
+        ic_cdk::spawn(store::keys::load())
+    });
 }

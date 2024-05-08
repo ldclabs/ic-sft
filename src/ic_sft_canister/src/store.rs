@@ -5,6 +5,7 @@ use ic_sft_types::{
     RevokeCollectionApprovalResult, RevokeTokenApprovalError, SftId, TransferError,
     TransferFromError, Value,
 };
+use ic_sft_types::{Block, Transaction};
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     storable::Bound,
@@ -19,18 +20,19 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use ic_sft_types::{Block, Transaction};
+use crate::utils::mac_256;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 const COLLECTION_MEMORY_ID: MemoryId = MemoryId::new(0);
-const TOKENS_MEMORY_ID: MemoryId = MemoryId::new(1);
-const HOLDERS_MEMORY_ID: MemoryId = MemoryId::new(2);
-const HOLDER_TOKENS_MEMORY_ID: MemoryId = MemoryId::new(3);
-const HOLDER_APPROVALS_MEMORY_ID: MemoryId = MemoryId::new(4);
-const ASSETS_MEMORY_ID: MemoryId = MemoryId::new(5);
-const BLOCKS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(6);
-const BLOCKS_DATA_MEMORY_ID: MemoryId = MemoryId::new(7);
+const KEYS_MEMORY_ID: MemoryId = MemoryId::new(1);
+const TOKENS_MEMORY_ID: MemoryId = MemoryId::new(2);
+const HOLDERS_MEMORY_ID: MemoryId = MemoryId::new(3);
+const HOLDER_TOKENS_MEMORY_ID: MemoryId = MemoryId::new(4);
+const HOLDER_APPROVALS_MEMORY_ID: MemoryId = MemoryId::new(5);
+const ASSETS_MEMORY_ID: MemoryId = MemoryId::new(6);
+const BLOCKS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(7);
+const BLOCKS_DATA_MEMORY_ID: MemoryId = MemoryId::new(8);
 
 thread_local! {
     static CHALLENGE_SECRET: RefCell<[u8; 32]> = const { RefCell::new([0; 32]) };
@@ -45,6 +47,12 @@ thread_local! {
             MEMORY_MANAGER.with_borrow(|m| m.get(COLLECTION_MEMORY_ID)),
             Collection::default()
         ).expect("failed to init COLLECTION store")
+    );
+
+    static KEYS: RefCell<StableBTreeMap<String, Vec<u8>, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with_borrow(|m| m.get(KEYS_MEMORY_ID)),
+        )
     );
 
     static TOKENS: RefCell<StableVec<Token, Memory>> = RefCell::new(
@@ -474,17 +482,51 @@ impl HolderTokens {
     }
 }
 
-pub mod challenge {
+pub mod keys {
     use super::*;
 
-    pub fn with_secret<R>(f: impl FnOnce(&[u8]) -> R) -> R {
-        CHALLENGE_SECRET.with(|r| f(r.borrow().as_slice()))
+    pub async fn load() {
+        let keys = KEYS.with(|r| r.borrow().iter().collect::<BTreeMap<String, Vec<u8>>>());
+        {
+            let mut secret: Vec<u8> = match keys.get("CHALLENGE_SECRET") {
+                Some(secret) => secret.clone(),
+                None => vec![],
+            };
+            if secret.len() != 32 {
+                let rr = ic_cdk::api::management_canister::main::raw_rand()
+                    .await
+                    .expect("failed to get random bytes");
+                secret = mac_256(&rr.0, b"CHALLENGE_SECRET").to_vec();
+            }
+            CHALLENGE_SECRET.with(|r| r.borrow_mut().copy_from_slice(&secret));
+        }
     }
 
-    pub fn set_secret(secret: [u8; 32]) {
-        CHALLENGE_SECRET.with(|r| *r.borrow_mut() = secret);
+    pub fn save() {
+        KEYS.with(|r| {
+            r.borrow_mut().insert(
+                "CHALLENGE_SECRET".to_string(),
+                CHALLENGE_SECRET.with(|r| r.borrow().to_vec()),
+            );
+        });
+    }
+
+    pub fn with_challenge_secret<R>(f: impl FnOnce(&[u8; 32]) -> R) -> R {
+        CHALLENGE_SECRET.with(|r| f(&r.borrow()))
     }
 }
+
+// pub mod challenge {
+//     use super::*;
+
+//     pub fn with_secret<R>(f: impl FnOnce(&[u8]) -> R) -> R {
+//         CHALLENGE_SECRET.with(|r| f(r.borrow().as_slice()))
+//     }
+
+//     pub fn set_secret(secret: [u8; 32]) {
+//         CHALLENGE_SECRET.with(|r| *r.borrow_mut() = secret);
+//     }
+// }
 
 pub mod collection {
     use super::*;

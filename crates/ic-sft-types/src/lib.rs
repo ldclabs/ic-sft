@@ -40,9 +40,9 @@ impl SftId {
     }
 }
 
-impl ToString for SftId {
-    fn to_string(&self) -> String {
-        format!("{}-{}", self.0, self.1)
+impl std::fmt::Display for SftId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.0, self.1)
     }
 }
 

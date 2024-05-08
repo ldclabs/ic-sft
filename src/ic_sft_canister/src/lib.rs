@@ -1,3 +1,6 @@
+mod api_icrc10;
+mod api_icrc37;
+mod api_icrc7;
 mod api_init;
 mod api_sft_manage;
 mod api_sft_query;

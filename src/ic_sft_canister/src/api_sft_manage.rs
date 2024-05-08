@@ -110,7 +110,7 @@ pub fn sft_challenge(args: ChallengeArg) -> Result<ByteBuf, String> {
         }
     });
     let ts = ic_cdk::api::time() / SECOND;
-    store::challenge::with_secret(|secret| Ok(ByteBuf::from(args.challenge(secret, ts))))
+    store::keys::with_challenge_secret(|secret| Ok(ByteBuf::from(args.challenge(secret, ts))))
 }
 
 // Create a token.
@@ -158,7 +158,7 @@ pub fn sft_create_token_by_challenge(args: CreateTokenArg) -> Result<Nat, String
     let now = ic_cdk::api::time() / SECOND;
     let expire_at = now - 60 * 10;
     let hash = sha3_256(&args.asset_content);
-    store::challenge::with_secret(|secret| {
+    store::keys::with_challenge_secret(|secret| {
         ChallengeArg {
             author: caller,
             asset_hash: hash,
