@@ -18,6 +18,7 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 ciborium = { workspace = true }
 ic-stable-structures = { workspace = true }
+ic-certification = "2.5"
 futures = "0.3"
 hex = "0.4"
 hmac = "0.12"

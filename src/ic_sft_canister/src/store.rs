@@ -1,11 +1,12 @@
 use candid::{Nat, Principal};
 use ciborium::{from_reader, into_writer};
+use ic_certification::{HashTreeNode, Label};
 use ic_sft_types::{
     ApprovalInfo, ApproveTokenError, Metadata, RevokeCollectionApprovalError,
     RevokeCollectionApprovalResult, RevokeTokenApprovalError, SftId, TransferError,
     TransferFromError, Value,
 };
-use ic_sft_types::{Block, Transaction};
+use ic_sft_types::{Block, BlockWithId, GetBlocksRequest, GetBlocksResult, Transaction};
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     storable::Bound,
@@ -106,6 +107,7 @@ pub struct Collection {
     pub updated_at: u64,
     pub last_block_index: Option<u64>,
     pub last_block_hash: Option<Hash>,
+    pub archived_blocks: u64,
 
     pub minters: BTreeSet<Principal>,
     pub managers: BTreeSet<Principal>,
@@ -182,6 +184,29 @@ impl Collection {
             );
         }
         res
+    }
+
+    pub fn root_hash(&self) -> [u8; 32] {
+        self.hash_tree().digest()
+    }
+
+    pub fn hash_tree(&self) -> HashTreeNode {
+        match self.last_block_hash {
+            Some(hash) => {
+                let last_block_index = self.last_block_index.unwrap_or(0);
+                HashTreeNode::Fork(Box::new((
+                    HashTreeNode::Labeled(
+                        Label::from("last_block_index"),
+                        Box::new(HashTreeNode::Leaf(last_block_index.to_be_bytes().to_vec())),
+                    ),
+                    HashTreeNode::Labeled(
+                        Label::from("last_block_hash"),
+                        Box::new(HashTreeNode::Leaf(hash.as_slice().to_vec())),
+                    ),
+                )))
+            }
+            None => HashTreeNode::Empty(),
+        }
     }
 }
 
@@ -800,13 +825,77 @@ pub mod blocks {
     pub fn append(tx: Transaction) -> Result<u64, String> {
         collection::with_mut(|c| {
             let blk = Block::new(c.last_block_hash, tx);
-            let i = BLOCKS
+            let _ = BLOCKS
                 .with(|r| r.borrow_mut().append(&blk))
                 .map_err(|err| format!("failed to append transaction log, error {:?}", err))?;
+            let i = if let Some(i) = c.last_block_index {
+                i + 1
+            } else {
+                0
+            };
             c.last_block_index = Some(i);
             c.last_block_hash = Some(blk.hash());
+            ic_cdk::api::set_certified_data(&c.root_hash());
+
             Ok(i)
         })
+    }
+
+    pub fn get_blocks(args: Vec<GetBlocksRequest>) -> GetBlocksResult {
+        const MAX_BLOCKS_PER_RESPONSE: u64 = 100;
+
+        let coll = collection::with(|c| c.clone());
+
+        match coll.last_block_index {
+            None => GetBlocksResult {
+                log_length: Nat::from(0u64),
+                blocks: vec![],
+                archived_blocks: vec![],
+            },
+            Some(last_block_index) => BLOCKS.with(|r| {
+                let logs = r.borrow();
+                let mut blocks = vec![];
+                for arg in args {
+                    let (start, length) = arg
+                        .as_start_and_length()
+                        .unwrap_or_else(|msg| ic_cdk::api::trap(&msg));
+                    if start < coll.archived_blocks {
+                        break;
+                    }
+                    let offset = start - coll.archived_blocks;
+                    let logs_len = logs.len();
+                    if offset >= logs_len {
+                        break;
+                    }
+                    let max_length = MAX_BLOCKS_PER_RESPONSE.saturating_sub(blocks.len() as u64);
+                    if max_length == 0 {
+                        break;
+                    }
+                    let length = max_length.min(length).min(logs_len - offset);
+                    for i in 0..length {
+                        match logs.get(offset + i) {
+                            None => break,
+                            Some(block) => {
+                                blocks.push(BlockWithId {
+                                    id: Nat::from(start + i),
+                                    block: block.into_inner(),
+                                });
+                            }
+                        }
+                    }
+
+                    if blocks.len() as u64 >= MAX_BLOCKS_PER_RESPONSE {
+                        break;
+                    }
+                }
+
+                GetBlocksResult {
+                    log_length: Nat::from(last_block_index + 1),
+                    blocks,
+                    archived_blocks: vec![],
+                }
+            }),
+        }
     }
 }
 

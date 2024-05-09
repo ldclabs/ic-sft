@@ -28,6 +28,7 @@ pub fn init(args: InitArg) {
     });
 
     store::collection::save();
+    ic_cdk::api::set_certified_data(&store::collection::with(|r| r.root_hash()));
     ic_cdk_timers::set_timer(Duration::from_nanos(0), || {
         ic_cdk::spawn(store::keys::load())
     });

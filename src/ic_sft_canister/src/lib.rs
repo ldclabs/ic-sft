@@ -1,4 +1,5 @@
 mod api_icrc10;
+mod api_icrc3;
 mod api_icrc37;
 mod api_icrc7;
 mod api_init;
@@ -12,6 +13,10 @@ mod utils;
 use candid::{Nat, Principal};
 use ic_sft_types::*;
 use icrc_ledger_types::icrc1::account::Account;
+use icrc_ledger_types::icrc3::{
+    archive::{GetArchivesArgs, GetArchivesResult},
+    blocks::{GetBlocksRequest, GetBlocksResult, ICRC3DataCertificate, SupportedBlockType},
+};
 use serde_bytes::ByteBuf;
 use std::collections::BTreeSet;
 

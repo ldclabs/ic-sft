@@ -370,6 +370,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-certification"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20052ce9255fbe2de7041a4f6996fddd095ba1f31ae83b6c0ccdee5be6e7bbcf"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_bytes",
+ "sha2",
+]
+
+[[package]]
 name = "ic-ledger-types"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -438,6 +450,7 @@ dependencies = [
  "hmac",
  "ic-cdk",
  "ic-cdk-timers",
+ "ic-certification",
  "ic-ledger-types",
  "ic-sft-types",
  "ic-stable-structures",

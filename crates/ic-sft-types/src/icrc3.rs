@@ -12,6 +12,13 @@ use std::{borrow::Cow, convert::From, ops::Deref, string::ToString};
 
 use crate::{nat_to_u64, Metadata, Value};
 
+pub use icrc_ledger_types::icrc3::{
+    archive::{GetArchivesArgs, GetArchivesResult},
+    blocks::{
+        BlockWithId, GetBlocksRequest, GetBlocksResult, ICRC3DataCertificate, SupportedBlockType,
+    },
+};
+
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Block(ICRC3GenericBlock);
 
